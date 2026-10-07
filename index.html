@@ -12,7 +12,7 @@
 </style>
 </head>
 <body>
-<header><div><small>✈️ 10–15 de outubro de 2026</small><h1>🧭 Meu Roteiro</h1><p style="margin:3px 0;font-size:13px">Viagem em família • roteiro, desejos, gastos e reservas</p></div></header>
+<header><div><div class="line"><small>✈️ 10–15 de outubro de 2026</small><span id="syncBadge" class="pill" style="background:#ffffff22;color:#fff">☁️ Offline</span></div><h1>🧭 Meu Roteiro</h1><p style="margin:3px 0;font-size:13px">Viagem em família • roteiro, desejos, gastos e reservas</p></div></header>
 <main class="wrap">
 <section id="home"></section>
 <section id="route" class="hidden"></section>
@@ -29,6 +29,16 @@
 <button data-tab="notes"><b>📝</b>Anotações</button>
 <button data-tab="bookings"><b>🎟️</b>Reservas</button>
 </nav>
+
+<dialog id="syncDlg"><h2>☁️ Sincronização</h2>
+<p class="muted">Use o mesmo código em todos os aparelhos. O app continua funcionando offline e sincroniza quando houver internet.</p>
+<label>URL do projeto Supabase</label><input id="syncUrl" placeholder="https://xxxx.supabase.co" autocomplete="off">
+<label>Chave pública (anon/publishable)</label><input id="syncKey" placeholder="Chave pública do projeto" autocomplete="off">
+<label>Código compartilhado da viagem</label><div class="flex"><input id="syncCode" placeholder="Ex.: GRAMADO-..." style="flex:1"><button class="btn light" type="button" onclick="generateSyncCode()">Gerar</button></div>
+<label class="flex" style="font-weight:600"><input id="syncAuto" type="checkbox" style="width:auto"> Sincronizar automaticamente</label>
+<div id="syncMsg" class="muted" style="margin-top:10px"></div>
+<div class="foot"><button class="btn" type="button" onclick="connectSync()">Conectar</button><button class="btn light" type="button" onclick="pullCloud(true)">Baixar nuvem</button><button class="btn light" type="button" onclick="pushCloud(true)">Enviar este aparelho</button><button class="btn outline" type="button" onclick="syncDlg.close()">Fechar</button><button class="btn danger" type="button" onclick="disconnectSync()">Desconectar</button></div>
+</dialog>
 
 <dialog id="routeChoice"><h2>➕ Adicionar passeio</h2><p class="muted">Escolha como adicionar ao roteiro.</p><div class="foot" style="flex-direction:column"><button class="btn" onclick="pickWish()">❤️ Usar lista de desejos</button><button class="btn light" onclick="editActivity()">✏️ Novo passeio</button><button class="btn outline" onclick="routeChoice.close()">Cancelar</button></div></dialog>
 <dialog id="picker"><h2>❤️ Escolher da lista</h2><div id="pickerList"></div><div class="foot"><button class="btn outline" onclick="picker.close()">Voltar</button></div></dialog>
@@ -101,7 +111,7 @@ bookings:[
 {id:'b2',name:'Tchê Pierre',when:'12/10 às 20:30',notes:'Confirmado.'}
 ]};
 let state=JSON.parse(localStorage.getItem('meu-roteiro-v1')||'null')||structuredClone(defaults), selectedDate=dates[0][0];
-function save(){localStorage.setItem('meu-roteiro-v1',JSON.stringify(state));render()}
+function save(){state._updatedAt=new Date().toISOString();localStorage.setItem('meu-roteiro-v1',JSON.stringify(state));render();scheduleCloudPush()}
 function dayToday(){let d=new Date().toISOString().slice(0,10);return dates.some(x=>x[0]===d)?d:(d<dates[0][0]?dates[0][0]:dates.at(-1)[0])}
 selectedDate=dayToday();
 function period(a){let s=a.start||'12:00',e=a.end||s,h=+s.slice(0,2),he=+e.slice(0,2);let names=[];if(h<12)names.push('Manhã');if((h<18&&he>=12)||(h>=12&&h<18))names.push('Tarde');if(he>=18||h>=18)names.push('Noite');return names.join(' + ')||'Sem período'}
@@ -111,7 +121,7 @@ function money(n){return Number(n||0).toLocaleString('pt-BR',{style:'currency',c
 function activityCard(a){let spent=state.expenses.filter(e=>e.activityId===a.id).reduce((s,e)=>s+Number(e.amount||0),0);return '<div class="activity"><div class="line"><div><span class="pill">'+esc(period(a))+'</span><h3>'+(a.start?esc(a.start)+' · ':'')+esc(a.name)+'</h3><div class="muted">'+esc(a.status)+' · '+esc(a.environment||'Não definido')+(spent?' · '+money(spent):'')+'</div></div><button class="btn outline mini" onclick="editActivity(\''+a.id+'\')">Editar</button></div>'+(a.notes?'<p class="muted">'+esc(a.notes)+'</p>':'')+'<div class="flex"><button class="btn light mini" onclick="setStatus(\''+a.id+'\',\'Realizado\')">✓ Realizado</button><button class="btn outline mini" onclick="editExpense(\'\',\''+a.id+'\')">+ Gasto</button></div></div>'}
 function render(){
 let today=dayToday(), todayActs=sorted(today);
-$('#home').innerHTML='<h2>🏠 '+(today===dates[0][0]&&new Date().toISOString().slice(0,10)<dates[0][0]?'Primeiro dia':'Roteiro do dia')+'</h2><div class="card"><strong>'+esc(dates.find(d=>d[0]===today)?.[1]||today)+'</strong>'+(todayActs.length?todayActs.map(activityCard).join(''):'<div class="empty">Nenhum passeio programado.</div>')+'</div><div class="grid"><div class="card stat"><span class="muted">Passeios confirmados</span><strong>'+state.activities.length+'</strong></div><div class="card stat"><span class="muted">Gasto total</span><strong>'+money(state.expenses.reduce((s,e)=>s+Number(e.amount||0),0))+'</strong></div></div>';
+$('#home').innerHTML='<h2>🏠 '+(today===dates[0][0]&&new Date().toISOString().slice(0,10)<dates[0][0]?'Primeiro dia':'Roteiro do dia')+'</h2><div class="card"><strong>'+esc(dates.find(d=>d[0]===today)?.[1]||today)+'</strong>'+(todayActs.length?todayActs.map(activityCard).join(''):'<div class="empty">Nenhum passeio programado.</div>')+'</div><div class="grid"><div class="card stat"><span class="muted">Passeios confirmados</span><strong>'+state.activities.length+'</strong></div><div class="card stat"><span class="muted">Gasto total</span><strong>'+money(state.expenses.reduce((s,e)=>s+Number(e.amount||0),0))+'</strong></div></div><div class="card"><div class="line"><div><strong>☁️ Compartilhar entre aparelhos</strong><div class="muted" id="homeSyncStatus">'+syncStatusText()+'</div></div><button class="btn outline" onclick="openSync()">Configurar</button></div></div>';
 
 $('#route').innerHTML='<div class="line"><h2>🗓️ Roteiro</h2><button class="btn" onclick="routeChoice.showModal()">+ Passeio</button></div><div class="chips">'+dates.map(d=>'<button class="'+(d[0]===selectedDate?'on':'')+'" onclick="selectedDate=\''+d[0]+'\';render()">'+d[1]+'</button>').join('')+'</div><div class="card">'+(sorted(selectedDate).map(activityCard).join('')||'<div class="empty">Nada programado para este dia.</div>')+'</div>';
 
@@ -145,11 +155,29 @@ function refreshExpenseActivities(sel=''){expenseForm.elements.activityId.innerH
 expenseForm.elements.date.onchange=()=>refreshExpenseActivities();
 expenseForm.onsubmit=e=>{e.preventDefault();let v=Object.fromEntries(new FormData(e.target));v.amount=parseMoney(v.amount);v.saved=parseMoney(v.saved);if(v.id)state.expenses[state.expenses.findIndex(x=>x.id===v.id)]=v;else{v.id=uid();state.expenses.push(v)}expenseDlg.close();save()}
 delExpense.onclick=()=>{let id=expenseForm.elements.id.value;state.expenses=state.expenses.filter(x=>x.id!==id);expenseDlg.close();save()}
-function addNote(){state.notes.push({id:uid(),title:'Nova anotação',text:''});save()}function updNote(id,k,v){let n=state.notes.find(n=>n.id===id);n[k]=v;localStorage.setItem('meu-roteiro-v1',JSON.stringify(state))}function delNote(id){state.notes=state.notes.filter(n=>n.id!==id);save()}
+function addNote(){state.notes.push({id:uid(),title:'Nova anotação',text:''});save()}function updNote(id,k,v){let n=state.notes.find(n=>n.id===id);n[k]=v;state._updatedAt=new Date().toISOString();localStorage.setItem('meu-roteiro-v1',JSON.stringify(state));scheduleCloudPush()}function delNote(id){state.notes=state.notes.filter(n=>n.id!==id);save()}
 function editBooking(id=''){let b=state.bookings.find(x=>x.id===id)||{id:'',name:'',when:'',notes:''};fill(bookingForm,b);delBooking.style.display=id?'':'none';bookingDlg.showModal()}
 bookingForm.onsubmit=e=>{e.preventDefault();let v=Object.fromEntries(new FormData(e.target));if(v.id)state.bookings[state.bookings.findIndex(x=>x.id===v.id)]=v;else{v.id=uid();state.bookings.push(v)}bookingDlg.close();save()}
 delBooking.onclick=()=>{state.bookings=state.bookings.filter(x=>x.id!==bookingForm.elements.id.value);bookingDlg.close();save()}
+
+const SYNC_KEY='meu-roteiro-sync-v1';
+let syncCfg=JSON.parse(localStorage.getItem(SYNC_KEY)||'null')||{url:'',key:'',code:'',auto:true,lastRemote:''},syncTimer=null,syncPoll=null,syncBusy=false;
+function cleanUrl(v){return String(v||'').trim().replace(/\/$/,'')}
+function syncReady(){return !!(syncCfg.url&&syncCfg.key&&syncCfg.code)}
+function syncStatusText(){return syncReady()?(syncCfg.auto?'Conectado • sincronização automática':'Conectado • sincronização manual'):'Somente neste aparelho'}
+function updateSyncBadge(text,ok=true){let b=document.getElementById('syncBadge');if(b){b.textContent=text||(syncReady()?'☁️ Sincronizado':'☁️ Offline');b.style.background=ok?'#ffffff22':'#7b2f2f99'}let h=document.getElementById('homeSyncStatus');if(h)h.textContent=syncStatusText()}
+function openSync(){syncUrl.value=syncCfg.url||'';syncKey.value=syncCfg.key||'';syncCode.value=syncCfg.code||'';syncAuto.checked=syncCfg.auto!==false;syncMsg.textContent=syncReady()?'Configuração salva neste aparelho.':'Configure o serviço para compartilhar os dados.';syncDlg.showModal()}
+function generateSyncCode(){let a=new Uint8Array(12);crypto.getRandomValues(a);syncCode.value='TRIP-'+Array.from(a,x=>x.toString(16).padStart(2,'0')).join('').toUpperCase()}
+function saveSyncCfg(){syncCfg={...syncCfg,url:cleanUrl(syncUrl.value),key:syncKey.value.trim(),code:syncCode.value.trim(),auto:syncAuto.checked};localStorage.setItem(SYNC_KEY,JSON.stringify(syncCfg));setupSyncPolling();updateSyncBadge()}
+async function rpc(name,body){if(!syncReady())throw new Error('Sincronização não configurada.');let r=await fetch(syncCfg.url+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:syncCfg.key,Authorization:'Bearer '+syncCfg.key,'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok){let t=await r.text();throw new Error(t||('Erro '+r.status))}let txt=await r.text();return txt?JSON.parse(txt):null}
+async function connectSync(){saveSyncCfg();if(!syncReady()){syncMsg.textContent='Preencha URL, chave pública e código.';return}syncMsg.textContent='Conectando...';try{let remote=await rpc('load_trip',{p_code:syncCfg.code});if(remote&&remote.length&&remote[0].data){let remoteData=remote[0].data;let rt=Date.parse(remote[0].updated_at||0),lt=Date.parse(state._updatedAt||0);if(rt>lt){state=remoteData;localStorage.setItem('meu-roteiro-v1',JSON.stringify(state));syncCfg.lastRemote=remote[0].updated_at||'';localStorage.setItem(SYNC_KEY,JSON.stringify(syncCfg));syncMsg.textContent='Dados mais recentes baixados da nuvem.';render()}else{await pushCloud(false);syncMsg.textContent='Conectado. Este aparelho foi enviado para a nuvem.'}}else{await pushCloud(false);syncMsg.textContent='Roteiro criado na nuvem. Use o mesmo código no outro aparelho.'}updateSyncBadge('☁️ Sincronizado',true)}catch(e){syncMsg.textContent='Não foi possível conectar: '+e.message;updateSyncBadge('☁️ Erro',false)}}
+async function pushCloud(showMsg=false){if(!syncReady()||syncBusy)return;syncBusy=true;updateSyncBadge('☁️ Enviando…',true);try{state._updatedAt=state._updatedAt||new Date().toISOString();await rpc('save_trip',{p_code:syncCfg.code,p_data:state});syncCfg.lastRemote=new Date().toISOString();localStorage.setItem(SYNC_KEY,JSON.stringify(syncCfg));if(showMsg&&window.syncMsg)syncMsg.textContent='Dados deste aparelho enviados.';updateSyncBadge('☁️ Sincronizado',true)}catch(e){if(showMsg&&window.syncMsg)syncMsg.textContent='Erro ao enviar: '+e.message;updateSyncBadge('☁️ Offline',false)}finally{syncBusy=false}}
+async function pullCloud(showMsg=false){if(!syncReady()||syncBusy)return;syncBusy=true;try{let remote=await rpc('load_trip',{p_code:syncCfg.code});if(remote&&remote.length&&remote[0].data){let rt=Date.parse(remote[0].updated_at||0),last=Date.parse(syncCfg.lastRemote||0);if(showMsg||rt>last){state=remote[0].data;localStorage.setItem('meu-roteiro-v1',JSON.stringify(state));syncCfg.lastRemote=remote[0].updated_at||'';localStorage.setItem(SYNC_KEY,JSON.stringify(syncCfg));render()}if(showMsg&&window.syncMsg)syncMsg.textContent='Dados da nuvem baixados.';updateSyncBadge('☁️ Sincronizado',true)}}catch(e){if(showMsg&&window.syncMsg)syncMsg.textContent='Erro ao baixar: '+e.message;updateSyncBadge('☁️ Offline',false)}finally{syncBusy=false}}
+function scheduleCloudPush(){if(!syncReady()||syncCfg.auto===false)return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>pushCloud(false),900)}
+function setupSyncPolling(){clearInterval(syncPoll);if(syncReady()&&syncCfg.auto!==false)syncPoll=setInterval(()=>pullCloud(false),7000)}
+function disconnectSync(){if(!confirm('Desconectar este aparelho da sincronização? Os dados locais serão mantidos.'))return;syncCfg={url:'',key:'',code:'',auto:true,lastRemote:''};localStorage.removeItem(SYNC_KEY);clearInterval(syncPoll);syncDlg.close();updateSyncBadge('☁️ Offline',true);render()}
+
 document.querySelectorAll('select[name="date"]').forEach(s=>s.innerHTML=dates.map(d=>'<option value="'+d[0]+'">'+d[1]+'</option>').join(''));
-render();
+render();setupSyncPolling();updateSyncBadge();if(syncReady()&&syncCfg.auto!==false)setTimeout(()=>pullCloud(false),400);
 </script>
 </body></html>
