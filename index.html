@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#235d53">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Meu Roteiro">
+<title>Meu Roteiro</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#20362f;background:#f5f7f3}*{box-sizing:border-box}body{margin:0;padding-bottom:84px}button,input,select,textarea{font:inherit}button{cursor:pointer}header{background:linear-gradient(130deg,#20594f,#398a74);color:#fff;padding:calc(18px + env(safe-area-inset-top)) 18px 20px;border-radius:0 0 24px 24px}.wrap,header>div{max-width:720px;margin:auto}.wrap{padding:14px}.card{background:#fff;border:1px solid #e0eae1;border-radius:16px;padding:14px;margin-bottom:11px;box-shadow:0 3px 12px #2045310a}.line{display:flex;justify-content:space-between;align-items:center;gap:8px}.flex{display:flex;gap:7px;flex-wrap:wrap;align-items:center}.muted{font-size:12px;color:#718178}.btn{border:0;border-radius:11px;background:#235d53;color:#fff;padding:9px 12px;font-weight:650}.btn.light{background:#e9f2ec;color:#235d53}.btn.outline{background:#fff;border:1px solid #d6e4d9;color:#235d53}.btn.danger{background:#fff0e9;color:#a34e35}.mini{font-size:12px;padding:7px 9px}.pill{font-size:11px;background:#edf4ef;color:#235d53;border-radius:99px;padding:5px 8px}h1{font-size:24px;margin:4px 0}h2{font-size:19px;margin:4px 0 12px}h3{font-size:16px;margin:3px 0 6px}p{line-height:1.45}input,select,textarea{width:100%;padding:10px;border:1px solid #d7e2d9;border-radius:10px;background:#fff;font-size:16px}label{display:block;font-size:12px;font-weight:700;margin:10px 0 5px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.hidden{display:none!important}.empty{text-align:center;color:#718178;padding:22px 8px}.period{font-size:12px;font-weight:800;color:#3e5b50;background:#eef4f0;padding:7px 9px;border-radius:8px;margin:10px 0 4px}.activity{padding:10px 0;border-top:1px solid #edf2ee}.activity:first-child{border-top:0}.chips{display:flex;gap:6px;overflow:auto;padding-bottom:8px}.chips button{white-space:nowrap;border:1px solid #d8e6d9;background:#fff;color:#36574b;border-radius:99px;padding:8px 10px}.chips button.on{background:#235d53;color:#fff}.filters{background:#fff;border:1px solid #dce8df;border-radius:15px;padding:12px;margin:10px 0}nav{position:fixed;z-index:20;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e0e8e0;display:flex;justify-content:space-around;padding:7px 2px calc(7px + env(safe-area-inset-bottom))}nav button{border:0;background:none;color:#75847b;font-size:10px;display:flex;flex-direction:column;align-items:center;gap:2px}nav b{font-size:20px}nav .active{color:#235d53;font-weight:800}dialog{border:0;border-radius:18px;width:min(94vw,500px);max-height:88dvh;overflow:auto;padding:18px;box-shadow:0 20px 60px #0005}dialog::backdrop{background:#132a21a9}.foot{display:flex;gap:7px;flex-wrap:wrap;margin-top:15px}.stat strong{display:block;font-size:20px;color:#235d53}
+</style>
+</head>
+<body>
+<header><div><small>✈️ 10–15 de outubro de 2026</small><h1>🧭 Meu Roteiro</h1><p style="margin:3px 0;font-size:13px">Viagem em família • roteiro, desejos, gastos e reservas</p></div></header>
+<main class="wrap">
+<section id="home"></section>
+<section id="route" class="hidden"></section>
+<section id="wish" class="hidden"></section>
+<section id="money" class="hidden"></section>
+<section id="notes" class="hidden"></section>
+<section id="bookings" class="hidden"></section>
+</main>
+<nav>
+<button class="active" data-tab="home"><b>🏠</b>Início</button>
+<button data-tab="route"><b>🗓️</b>Roteiro</button>
+<button data-tab="wish"><b>❤️</b>Desejos</button>
+<button data-tab="money"><b>💰</b>Gastos</button>
+<button data-tab="notes"><b>📝</b>Anotações</button>
+<button data-tab="bookings"><b>🎟️</b>Reservas</button>
+</nav>
+
+<dialog id="routeChoice"><h2>➕ Adicionar passeio</h2><p class="muted">Escolha como adicionar ao roteiro.</p><div class="foot" style="flex-direction:column"><button class="btn" onclick="pickWish()">❤️ Usar lista de desejos</button><button class="btn light" onclick="editActivity()">✏️ Novo passeio</button><button class="btn outline" onclick="routeChoice.close()">Cancelar</button></div></dialog>
+<dialog id="picker"><h2>❤️ Escolher da lista</h2><div id="pickerList"></div><div class="foot"><button class="btn outline" onclick="picker.close()">Voltar</button></div></dialog>
+
+<dialog id="activityDlg"><h2 id="activityTitle">Passeio</h2><form id="activityForm">
+<input type="hidden" name="id"><input type="hidden" name="wishId">
+<label>Data</label><select name="date"></select>
+<div class="grid"><div><label>Início</label><input type="time" name="start"></div><div><label>Término</label><input type="time" name="end"></div></div>
+<label>Passeio</label><input name="name" required>
+<label>Ambiente</label><select name="environment"><option>Não definido</option><option>Ao ar livre</option><option>Coberto</option></select>
+<label>Status</label><select name="status"><option>Planejado</option><option>Realizado</option><option>Substituído</option><option>Cancelado</option></select>
+<label>Observações</label><textarea name="notes"></textarea>
+<div class="foot"><button class="btn">Salvar</button><button type="button" class="btn outline" onclick="activityDlg.close()">Voltar</button><button type="button" id="delActivity" class="btn danger">Excluir</button></div>
+</form></dialog>
+
+<dialog id="wishDlg"><h2 id="wishTitle">Local desejado</h2><form id="wishForm">
+<input type="hidden" name="id"><label>Nome</label><input name="name" required>
+<label>Ambiente</label><select name="environment"><option>Não definido</option><option>Ao ar livre</option><option>Coberto</option></select>
+<label>Observações</label><textarea name="notes"></textarea>
+<div class="foot"><button class="btn">Salvar</button><button type="button" class="btn outline" onclick="wishDlg.close()">Voltar</button><button type="button" id="delWish" class="btn danger">Excluir</button></div>
+</form></dialog>
+
+<dialog id="expenseDlg"><h2 id="expenseTitle">Gasto</h2><form id="expenseForm">
+<input type="hidden" name="id"><label>Descrição</label><input name="name" required>
+<div class="grid"><div><label>Valor (R$)</label><input name="amount" inputmode="decimal" required></div><div><label>Economia (R$)</label><input name="saved" inputmode="decimal"></div></div>
+<label>Data</label><select name="date"></select>
+<label>Passeio vinculado</label><select name="activityId"></select>
+<label>Categoria</label><select name="category"><option>Passeios</option><option>Alimentação</option><option>Transporte</option><option>Compras</option><option>Outros</option></select>
+<div class="foot"><button class="btn">Salvar</button><button type="button" class="btn outline" onclick="expenseDlg.close()">Voltar</button><button type="button" id="delExpense" class="btn danger">Excluir</button></div>
+</form></dialog>
+
+<dialog id="bookingDlg"><h2>Reserva</h2><form id="bookingForm">
+<input type="hidden" name="id"><label>Nome</label><input name="name" required><label>Data/horário</label><input name="when"><label>Detalhes</label><textarea name="notes"></textarea>
+<div class="foot"><button class="btn">Salvar</button><button type="button" class="btn outline" onclick="bookingDlg.close()">Voltar</button><button type="button" id="delBooking" class="btn danger">Excluir</button></div>
+</form></dialog>
+
+<script>
+const $=s=>document.querySelector(s), uid=()=>Math.random().toString(36).slice(2,10), esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+const dates=[['2026-10-10','10/10 · Sáb'],['2026-10-11','11/10 · Dom'],['2026-10-12','12/10 · Seg'],['2026-10-13','13/10 · Ter'],['2026-10-14','14/10 · Qua'],['2026-10-15','15/10 · Qui']];
+const defaults={
+activities:[
+{id:'jolimont',wishId:'w-jolimont',date:'2026-10-11',start:'09:30',end:'',name:'Vinícola Jolimont',environment:'Não definido',status:'Planejado',notes:'Passeio confirmado.'},
+{id:'snowland',wishId:'w-snowland',date:'2026-10-12',start:'10:00',end:'',name:'Snowland',environment:'Coberto',status:'Planejado',notes:'Ingresso comprado.'},
+{id:'tche',wishId:'w-tche',date:'2026-10-12',start:'20:30',end:'',name:'Tchê Pierre',environment:'Coberto',status:'Planejado',notes:'Substituiu o Era do Fogo.'}
+],
+wishlist:[
+{id:'w-jolimont',name:'Vinícola Jolimont',environment:'Não definido',notes:''},
+{id:'w-snowland',name:'Snowland',environment:'Coberto',notes:'Ingresso comprado para 12/10 às 10h.'},
+{id:'w-tche',name:'Tchê Pierre',environment:'Coberto',notes:'Reserva às 20:30.'},
+{id:'w-aldeia',name:'Aldeia do Papai Noel',environment:'Ao ar livre',notes:''},
+{id:'w-ruatorta',name:'Rua Torta',environment:'Ao ar livre',notes:''},
+{id:'w-etnias',name:'Praça das Etnias',environment:'Ao ar livre',notes:''},
+{id:'w-lagonegro',name:'Lago Negro',environment:'Ao ar livre',notes:'Pedalinho se o tempo permitir.'},
+{id:'w-florybal',name:'Florybal',environment:'Não definido',notes:''},
+{id:'w-bruxa',name:'Casa da Bruxa',environment:'Coberto',notes:'Café da tarde.'},
+{id:'w-ruacoberta',name:'Rua Coberta',environment:'Coberto',notes:''},
+{id:'w-minimundo',name:'Mini Mundo',environment:'Ao ar livre',notes:''},
+{id:'w-olivas',name:'Olivas de Gramado',environment:'Ao ar livre',notes:''},
+{id:'w-prawer',name:'Prawer Chocolates',environment:'Coberto',notes:''},
+{id:'w-caramau',name:'Cara de Mau',environment:'Coberto',notes:''}
+],
+expenses:[],
+notes:[
+{id:'n1',title:'Roteiro 1',text:'À tarde: Aldeia do Papai Noel → Rua Torta → Praça das Etnias.'},
+{id:'n2',title:'Roteiro 2',text:'Lago Negro → Florybal → Casa da Bruxa.'},
+{id:'n3',title:'Roteiro 3',text:'Rua Coberta → Mini Mundo.'}
+],
+bookings:[
+{id:'b1',name:'Snowland',when:'12/10 às 10:00',notes:'Ingresso comprado.'},
+{id:'b2',name:'Tchê Pierre',when:'12/10 às 20:30',notes:'Confirmado.'}
+]};
+let state=JSON.parse(localStorage.getItem('meu-roteiro-v1')||'null')||structuredClone(defaults), selectedDate=dates[0][0];
+function save(){localStorage.setItem('meu-roteiro-v1',JSON.stringify(state));render()}
+function dayToday(){let d=new Date().toISOString().slice(0,10);return dates.some(x=>x[0]===d)?d:(d<dates[0][0]?dates[0][0]:dates.at(-1)[0])}
+selectedDate=dayToday();
+function period(a){let s=a.start||'12:00',e=a.end||s,h=+s.slice(0,2),he=+e.slice(0,2);let names=[];if(h<12)names.push('Manhã');if((h<18&&he>=12)||(h>=12&&h<18))names.push('Tarde');if(he>=18||h>=18)names.push('Noite');return names.join(' + ')||'Sem período'}
+function sorted(date){return state.activities.filter(a=>a.date===date).sort((a,b)=>(a.start||'99:99').localeCompare(b.start||'99:99'))}
+function wishStatus(w){let acts=state.activities.filter(a=>a.wishId===w.id||a.name.toLowerCase()===w.name.toLowerCase());return {inRoute:acts.length>0,done:acts.some(a=>a.status==='Realizado')}}
+function money(n){return Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+function activityCard(a){let spent=state.expenses.filter(e=>e.activityId===a.id).reduce((s,e)=>s+Number(e.amount||0),0);return '<div class="activity"><div class="line"><div><span class="pill">'+esc(period(a))+'</span><h3>'+(a.start?esc(a.start)+' · ':'')+esc(a.name)+'</h3><div class="muted">'+esc(a.status)+' · '+esc(a.environment||'Não definido')+(spent?' · '+money(spent):'')+'</div></div><button class="btn outline mini" onclick="editActivity(\''+a.id+'\')">Editar</button></div>'+(a.notes?'<p class="muted">'+esc(a.notes)+'</p>':'')+'<div class="flex"><button class="btn light mini" onclick="setStatus(\''+a.id+'\',\'Realizado\')">✓ Realizado</button><button class="btn outline mini" onclick="editExpense(\'\',\''+a.id+'\')">+ Gasto</button></div></div>'}
+function render(){
+let today=dayToday(), todayActs=sorted(today);
+$('#home').innerHTML='<h2>🏠 '+(today===dates[0][0]&&new Date().toISOString().slice(0,10)<dates[0][0]?'Primeiro dia':'Roteiro do dia')+'</h2><div class="card"><strong>'+esc(dates.find(d=>d[0]===today)?.[1]||today)+'</strong>'+(todayActs.length?todayActs.map(activityCard).join(''):'<div class="empty">Nenhum passeio programado.</div>')+'</div><div class="grid"><div class="card stat"><span class="muted">Passeios confirmados</span><strong>'+state.activities.length+'</strong></div><div class="card stat"><span class="muted">Gasto total</span><strong>'+money(state.expenses.reduce((s,e)=>s+Number(e.amount||0),0))+'</strong></div></div>';
+
+$('#route').innerHTML='<div class="line"><h2>🗓️ Roteiro</h2><button class="btn" onclick="routeChoice.showModal()">+ Passeio</button></div><div class="chips">'+dates.map(d=>'<button class="'+(d[0]===selectedDate?'on':'')+'" onclick="selectedDate=\''+d[0]+'\';render()">'+d[1]+'</button>').join('')+'</div><div class="card">'+(sorted(selectedDate).map(activityCard).join('')||'<div class="empty">Nada programado para este dia.</div>')+'</div>';
+
+let env=$('#wish')?.dataset.env||'Todos', routeF=$('#wish')?.dataset.route||'Todos', doneF=$('#wish')?.dataset.done||'Todos', q=$('#wish')?.dataset.q||'';
+let filtered=state.wishlist.filter(w=>{let st=wishStatus(w);return (env==='Todos'||w.environment===env)&&(routeF==='Todos'||(routeF==='No roteiro'&&st.inRoute)||(routeF==='Fora do roteiro'&&!st.inRoute))&&(doneF==='Todos'||(doneF==='Realizado'&&st.done)||(doneF==='Não realizado'&&!st.done))&&(!q||w.name.toLowerCase().includes(q.toLowerCase())||(w.notes||'').toLowerCase().includes(q.toLowerCase()))});
+$('#wish').innerHTML='<div class="line"><h2>❤️ Lista de desejos</h2><button class="btn" onclick="editWish()">+ Local</button></div><div class="filters"><label>Buscar</label><input value="'+esc(q)+'" oninput="setWF(\'q\',this.value)"><div class="grid"><div><label>Ambiente</label><select onchange="setWF(\'env\',this.value)"><option>Todos</option><option>Ao ar livre</option><option>Coberto</option><option>Não definido</option></select></div><div><label>Roteiro</label><select onchange="setWF(\'route\',this.value)"><option>Todos</option><option>No roteiro</option><option>Fora do roteiro</option></select></div></div><label>Realização</label><select onchange="setWF(\'done\',this.value)"><option>Todos</option><option>Realizado</option><option>Não realizado</option></select><p class="muted">'+filtered.length+' local(is)</p></div>'+filtered.map(w=>{let st=wishStatus(w);return '<div class="card"><div class="line"><div><h3>'+esc(w.name)+'</h3><div class="flex"><span class="pill">'+esc(w.environment)+'</span><span class="pill">'+(st.inRoute?'📅 No roteiro':'➕ Fora do roteiro')+'</span><span class="pill">'+(st.done?'✅ Realizado':'○ Não realizado')+'</span></div></div><button class="btn outline mini" onclick="editWish(\''+w.id+'\')">Editar</button></div>'+(w.notes?'<p class="muted">'+esc(w.notes)+'</p>':'')+(st.inRoute?'':'<button class="btn light mini" onclick="useWish(\''+w.id+'\')">Adicionar ao roteiro</button>')+'</div>'}).join('');
+
+let total=state.expenses.reduce((s,e)=>s+Number(e.amount||0),0),saved=state.expenses.reduce((s,e)=>s+Number(e.saved||0),0);
+$('#money').innerHTML='<div class="line"><h2>💰 Gastos</h2><button class="btn" onclick="editExpense()">+ Gasto</button></div><div class="grid"><div class="card stat"><span class="muted">Total gasto</span><strong>'+money(total)+'</strong></div><div class="card stat"><span class="muted">Economia</span><strong>'+money(saved)+'</strong></div></div>'+state.expenses.map(e=>'<div class="card"><div class="line"><div><strong>'+esc(e.name)+'</strong><div class="muted">'+esc(e.date)+' · '+esc(e.category)+'</div></div><strong>'+money(e.amount)+'</strong></div><button class="btn outline mini" onclick="editExpense(\''+e.id+'\')">Editar</button></div>').join('')||'<div class="empty">Nenhum gasto lançado.</div>';
+
+$('#notes').innerHTML='<div class="line"><h2>📝 Anotações</h2><button class="btn" onclick="addNote()">+ Anotação</button></div>'+state.notes.map(n=>'<div class="card"><label>Título</label><input value="'+esc(n.title)+'" oninput="updNote(\''+n.id+'\',\'title\',this.value)"><label>Anotação</label><textarea oninput="updNote(\''+n.id+'\',\'text\',this.value)">'+esc(n.text)+'</textarea><button class="btn outline mini" onclick="delNote(\''+n.id+'\')">Excluir</button></div>').join('');
+
+$('#bookings').innerHTML='<div class="line"><h2>🎟️ Reservas</h2><button class="btn" onclick="editBooking()">+ Reserva</button></div>'+state.bookings.map(b=>'<div class="card"><strong>'+esc(b.name)+'</strong><p class="muted">'+esc(b.when)+'</p><p>'+esc(b.notes)+'</p><button class="btn outline mini" onclick="editBooking(\''+b.id+'\')">Editar</button></div>').join('');
+}
+function tab(t){document.querySelectorAll('main section').forEach(s=>s.classList.toggle('hidden',s.id!==t));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));scrollTo(0,0)}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>tab(b.dataset.tab));
+function fill(form,obj){Object.keys(obj).forEach(k=>{if(form.elements[k])form.elements[k].value=obj[k]??''})}
+function editActivity(id='',wishId=''){let a=state.activities.find(x=>x.id===id)||{id:'',wishId,date:selectedDate,start:'',end:'',name:'',environment:'Não definido',status:'Planejado',notes:''};if(wishId){let w=state.wishlist.find(x=>x.id===wishId);a={...a,wishId:w.id,name:w.name,environment:w.environment,notes:w.notes}}fill(activityForm,a);delActivity.style.display=id?'':'none';activityDlg.showModal()}
+activityForm.onsubmit=e=>{e.preventDefault();let v=Object.fromEntries(new FormData(e.target));if(v.id){state.activities[state.activities.findIndex(a=>a.id===v.id)]=v}else{v.id=uid();state.activities.push(v)}selectedDate=v.date;activityDlg.close();save()}
+delActivity.onclick=()=>{let id=activityForm.elements.id.value;if(confirm('Excluir passeio?')){state.activities=state.activities.filter(a=>a.id!==id);activityDlg.close();save()}}
+function setStatus(id,s){let a=state.activities.find(a=>a.id===id);if(a){a.status=s;save()}}
+function pickWish(){routeChoice.close();pickerList.innerHTML=state.wishlist.map(w=>'<button class="btn light" style="display:block;width:100%;margin:7px 0" onclick="picker.close();editActivity(\'\',\''+w.id+'\')">'+esc(w.name)+'</button>').join('');picker.showModal()}
+function useWish(id){tab('route');editActivity('',id)}
+function editWish(id=''){let w=state.wishlist.find(x=>x.id===id)||{id:'',name:'',environment:'Não definido',notes:''};fill(wishForm,w);delWish.style.display=id?'':'none';wishDlg.showModal()}
+wishForm.onsubmit=e=>{e.preventDefault();let v=Object.fromEntries(new FormData(e.target));if(v.id){state.wishlist[state.wishlist.findIndex(w=>w.id===v.id)]=v}else{v.id=uid();state.wishlist.push(v)}wishDlg.close();save()}
+delWish.onclick=()=>{let id=wishForm.elements.id.value;if(state.activities.some(a=>a.wishId===id))return alert('Este local está no roteiro. Remova o passeio antes.');state.wishlist=state.wishlist.filter(w=>w.id!==id);wishDlg.close();save()}
+function setWF(k,v){wish.dataset[k]=v;render()}
+function parseMoney(v){let s=String(v||'').replace(/R\$|\s/g,'');if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');let n=Number(s);return Number.isFinite(n)?n:0}
+function editExpense(id='',activityId=''){let e=state.expenses.find(x=>x.id===id)||{id:'',name:'',amount:'',saved:'',date:activityId?state.activities.find(a=>a.id===activityId)?.date||selectedDate:selectedDate,activityId,category:'Passeios'};fill(expenseForm,e);refreshExpenseActivities(e.activityId);delExpense.style.display=id?'':'none';expenseDlg.showModal()}
+function refreshExpenseActivities(sel=''){expenseForm.elements.activityId.innerHTML='<option value="">Sem vínculo</option>'+sorted(expenseForm.elements.date.value).map(a=>'<option value="'+a.id+'">'+esc((a.start||'')+' '+a.name)+'</option>').join('');expenseForm.elements.activityId.value=sel}
+expenseForm.elements.date.onchange=()=>refreshExpenseActivities();
+expenseForm.onsubmit=e=>{e.preventDefault();let v=Object.fromEntries(new FormData(e.target));v.amount=parseMoney(v.amount);v.saved=parseMoney(v.saved);if(v.id)state.expenses[state.expenses.findIndex(x=>x.id===v.id)]=v;else{v.id=uid();state.expenses.push(v)}expenseDlg.close();save()}
+delExpense.onclick=()=>{let id=expenseForm.elements.id.value;state.expenses=state.expenses.filter(x=>x.id!==id);expenseDlg.close();save()}
+function addNote(){state.notes.push({id:uid(),title:'Nova anotação',text:''});save()}function updNote(id,k,v){let n=state.notes.find(n=>n.id===id);n[k]=v;localStorage.setItem('meu-roteiro-v1',JSON.stringify(state))}function delNote(id){state.notes=state.notes.filter(n=>n.id!==id);save()}
+function editBooking(id=''){let b=state.bookings.find(x=>x.id===id)||{id:'',name:'',when:'',notes:''};fill(bookingForm,b);delBooking.style.display=id?'':'none';bookingDlg.showModal()}
+bookingForm.onsubmit=e=>{e.preventDefault();let v=Object.fromEntries(new FormData(e.target));if(v.id)state.bookings[state.bookings.findIndex(x=>x.id===v.id)]=v;else{v.id=uid();state.bookings.push(v)}bookingDlg.close();save()}
+delBooking.onclick=()=>{state.bookings=state.bookings.filter(x=>x.id!==bookingForm.elements.id.value);bookingDlg.close();save()}
+document.querySelectorAll('select[name="date"]').forEach(s=>s.innerHTML=dates.map(d=>'<option value="'+d[0]+'">'+d[1]+'</option>').join(''));
+render();
+</script>
+</body></html>
