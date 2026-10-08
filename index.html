@@ -160,7 +160,6 @@ function editBooking(id=''){let b=state.bookings.find(x=>x.id===id)||{id:'',name
 bookingForm.onsubmit=e=>{e.preventDefault();let v=Object.fromEntries(new FormData(e.target));if(v.id)state.bookings[state.bookings.findIndex(x=>x.id===v.id)]=v;else{v.id=uid();state.bookings.push(v)}bookingDlg.close();save()}
 delBooking.onclick=()=>{state.bookings=state.bookings.filter(x=>x.id!==bookingForm.elements.id.value);bookingDlg.close();save()}
 
-const SYNC_KEY='meu-roteiro-sync-v1';
 const SYNC_KEY='meu-roteiro-sync-v2';
 
 const SYNC_ENDPOINT =
