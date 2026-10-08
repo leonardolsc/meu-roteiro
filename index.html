@@ -161,23 +161,466 @@ bookingForm.onsubmit=e=>{e.preventDefault();let v=Object.fromEntries(new FormDat
 delBooking.onclick=()=>{state.bookings=state.bookings.filter(x=>x.id!==bookingForm.elements.id.value);bookingDlg.close();save()}
 
 const SYNC_KEY='meu-roteiro-sync-v1';
-let syncCfg=JSON.parse(localStorage.getItem(SYNC_KEY)||'null')||{url:'',key:'',code:'',auto:true,lastRemote:''},syncTimer=null,syncPoll=null,syncBusy=false;
-function cleanUrl(v){return String(v||'').trim().replace(/\/$/,'')}
-function syncReady(){return !!(syncCfg.url&&syncCfg.key&&syncCfg.code)}
-function syncStatusText(){return syncReady()?(syncCfg.auto?'Conectado • sincronização automática':'Conectado • sincronização manual'):'Somente neste aparelho'}
-function updateSyncBadge(text,ok=true){let b=document.getElementById('syncBadge');if(b){b.textContent=text||(syncReady()?'☁️ Sincronizado':'☁️ Offline');b.style.background=ok?'#ffffff22':'#7b2f2f99'}let h=document.getElementById('homeSyncStatus');if(h)h.textContent=syncStatusText()}
-function openSync(){syncUrl.value=syncCfg.url||'';syncKey.value=syncCfg.key||'';syncCode.value=syncCfg.code||'';syncAuto.checked=syncCfg.auto!==false;syncMsg.textContent=syncReady()?'Configuração salva neste aparelho.':'Configure o serviço para compartilhar os dados.';syncDlg.showModal()}
-function generateSyncCode(){let a=new Uint8Array(12);crypto.getRandomValues(a);syncCode.value='TRIP-'+Array.from(a,x=>x.toString(16).padStart(2,'0')).join('').toUpperCase()}
-function saveSyncCfg(){syncCfg={...syncCfg,url:cleanUrl(syncUrl.value),key:syncKey.value.trim(),code:syncCode.value.trim(),auto:syncAuto.checked};localStorage.setItem(SYNC_KEY,JSON.stringify(syncCfg));setupSyncPolling();updateSyncBadge()}
-async function rpc(name,body){if(!syncReady())throw new Error('Sincronização não configurada.');let r=await fetch(syncCfg.url+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:syncCfg.key,Authorization:'Bearer '+syncCfg.key,'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok){let t=await r.text();throw new Error(t||('Erro '+r.status))}let txt=await r.text();return txt?JSON.parse(txt):null}
-async function connectSync(){saveSyncCfg();if(!syncReady()){syncMsg.textContent='Preencha URL, chave pública e código.';return}syncMsg.textContent='Conectando...';try{let remote=await rpc('load_trip',{p_code:syncCfg.code});if(remote&&remote.length&&remote[0].data){let remoteData=remote[0].data;let rt=Date.parse(remote[0].updated_at||0),lt=Date.parse(state._updatedAt||0);if(rt>lt){state=remoteData;localStorage.setItem('meu-roteiro-v1',JSON.stringify(state));syncCfg.lastRemote=remote[0].updated_at||'';localStorage.setItem(SYNC_KEY,JSON.stringify(syncCfg));syncMsg.textContent='Dados mais recentes baixados da nuvem.';render()}else{await pushCloud(false);syncMsg.textContent='Conectado. Este aparelho foi enviado para a nuvem.'}}else{await pushCloud(false);syncMsg.textContent='Roteiro criado na nuvem. Use o mesmo código no outro aparelho.'}updateSyncBadge('☁️ Sincronizado',true)}catch(e){syncMsg.textContent='Não foi possível conectar: '+e.message;updateSyncBadge('☁️ Erro',false)}}
-async function pushCloud(showMsg=false){if(!syncReady()||syncBusy)return;syncBusy=true;updateSyncBadge('☁️ Enviando…',true);try{state._updatedAt=state._updatedAt||new Date().toISOString();await rpc('save_trip',{p_code:syncCfg.code,p_data:state});syncCfg.lastRemote=new Date().toISOString();localStorage.setItem(SYNC_KEY,JSON.stringify(syncCfg));if(showMsg&&window.syncMsg)syncMsg.textContent='Dados deste aparelho enviados.';updateSyncBadge('☁️ Sincronizado',true)}catch(e){if(showMsg&&window.syncMsg)syncMsg.textContent='Erro ao enviar: '+e.message;updateSyncBadge('☁️ Offline',false)}finally{syncBusy=false}}
-async function pullCloud(showMsg=false){if(!syncReady()||syncBusy)return;syncBusy=true;try{let remote=await rpc('load_trip',{p_code:syncCfg.code});if(remote&&remote.length&&remote[0].data){let rt=Date.parse(remote[0].updated_at||0),last=Date.parse(syncCfg.lastRemote||0);if(showMsg||rt>last){state=remote[0].data;localStorage.setItem('meu-roteiro-v1',JSON.stringify(state));syncCfg.lastRemote=remote[0].updated_at||'';localStorage.setItem(SYNC_KEY,JSON.stringify(syncCfg));render()}if(showMsg&&window.syncMsg)syncMsg.textContent='Dados da nuvem baixados.';updateSyncBadge('☁️ Sincronizado',true)}}catch(e){if(showMsg&&window.syncMsg)syncMsg.textContent='Erro ao baixar: '+e.message;updateSyncBadge('☁️ Offline',false)}finally{syncBusy=false}}
-function scheduleCloudPush(){if(!syncReady()||syncCfg.auto===false)return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>pushCloud(false),900)}
-function setupSyncPolling(){clearInterval(syncPoll);if(syncReady()&&syncCfg.auto!==false)syncPoll=setInterval(()=>pullCloud(false),7000)}
-function disconnectSync(){if(!confirm('Desconectar este aparelho da sincronização? Os dados locais serão mantidos.'))return;syncCfg={url:'',key:'',code:'',auto:true,lastRemote:''};localStorage.removeItem(SYNC_KEY);clearInterval(syncPoll);syncDlg.close();updateSyncBadge('☁️ Offline',true);render()}
+const SYNC_KEY='meu-roteiro-sync-v2';
 
+const SYNC_ENDPOINT =
+  'https://gkaduelanluljrplfkew.supabase.co/functions/v1/trip-sync';
+
+let syncCfg =
+  JSON.parse(localStorage.getItem(SYNC_KEY) || 'null') ||
+  {
+    token: '',
+    auto: true,
+    lastRemote: ''
+  };
+
+let syncTimer = null;
+let syncPoll = null;
+let syncBusy = false;
+
+
+// Recebe a configuração automaticamente pelo link.
+// Depois remove o código da barra de endereço.
+(function importShareToken() {
+
+  const params = new URLSearchParams(location.search);
+
+  const token = params.get('share');
+
+  if (token) {
+
+    syncCfg = {
+      ...syncCfg,
+      token: token.trim(),
+      auto: true
+    };
+
+    localStorage.setItem(
+      SYNC_KEY,
+      JSON.stringify(syncCfg)
+    );
+
+    params.delete('share');
+
+    const query = params.toString();
+
+    history.replaceState(
+      {},
+      document.title,
+      location.pathname +
+        (query ? '?' + query : '') +
+        location.hash
+    );
+  }
+
+})();
+
+
+function syncReady() {
+
+  return !!syncCfg.token;
+
+}
+
+
+function syncStatusText() {
+
+  return syncReady()
+    ? 'Conectado • sincronização automática'
+    : 'Abra o link compartilhado para conectar';
+
+}
+
+
+function updateSyncBadge(text, ok = true) {
+
+  const badge =
+    document.getElementById('syncBadge');
+
+  if (badge) {
+
+    badge.textContent =
+      text ||
+      (syncReady()
+        ? '☁️ Sincronizado'
+        : '☁️ Offline');
+
+    badge.style.background =
+      ok
+        ? '#ffffff22'
+        : '#7b2f2f99';
+  }
+
+  const home =
+    document.getElementById('homeSyncStatus');
+
+  if (home) {
+    home.textContent = syncStatusText();
+  }
+
+}
+
+
+function openSync() {
+
+  syncMsg.textContent =
+    syncReady()
+      ? 'Este aparelho está conectado e sincroniza automaticamente.'
+      : 'Abra o link compartilhado para conectar este aparelho.';
+
+  syncDlg.showModal();
+
+}
+
+
+async function syncApi(action, data = null) {
+
+  if (!syncReady()) {
+    throw new Error(
+      'Este aparelho ainda não está conectado.'
+    );
+  }
+
+  const response =
+    await fetch(
+      SYNC_ENDPOINT,
+      {
+        method: 'POST',
+
+        headers: {
+          'Content-Type': 'application/json'
+        },
+
+        body: JSON.stringify({
+          token: syncCfg.token,
+          action,
+          data
+        })
+      }
+    );
+
+  const result =
+    await response.json().catch(
+      () => ({})
+    );
+
+  if (!response.ok || result.error) {
+
+    throw new Error(
+      result.error ||
+      'Erro ' + response.status
+    );
+
+  }
+
+  return result;
+
+}
+
+
+async function pushCloud(showMsg = false) {
+
+  if (!syncReady() || syncBusy)
+    return;
+
+  syncBusy = true;
+
+  updateSyncBadge(
+    '☁️ Enviando…',
+    true
+  );
+
+  try {
+
+    state._updatedAt =
+      state._updatedAt ||
+      new Date().toISOString();
+
+    await syncApi(
+      'save',
+      state
+    );
+
+    syncCfg.lastRemote =
+      new Date().toISOString();
+
+    localStorage.setItem(
+      SYNC_KEY,
+      JSON.stringify(syncCfg)
+    );
+
+    if (
+      showMsg &&
+      window.syncMsg
+    ) {
+      syncMsg.textContent =
+        'Alterações enviadas.';
+    }
+
+    updateSyncBadge(
+      '☁️ Sincronizado',
+      true
+    );
+
+  }
+  catch (error) {
+
+    if (
+      showMsg &&
+      window.syncMsg
+    ) {
+      syncMsg.textContent =
+        'Erro ao enviar: ' +
+        error.message;
+    }
+
+    updateSyncBadge(
+      '☁️ Offline',
+      false
+    );
+
+  }
+  finally {
+
+    syncBusy = false;
+
+  }
+
+}
+
+
+async function pullCloud(showMsg = false) {
+
+  if (!syncReady() || syncBusy)
+    return;
+
+  syncBusy = true;
+
+  try {
+
+    const result =
+      await syncApi('load');
+
+    const remote =
+      result.trip;
+
+    if (
+      remote &&
+      remote.data
+    ) {
+
+      const remoteTime =
+        Date.parse(
+          remote.updated_at || 0
+        );
+
+      const localTime =
+        Date.parse(
+          syncCfg.lastRemote || 0
+        );
+
+      if (
+        showMsg ||
+        remoteTime > localTime
+      ) {
+
+        state =
+          remote.data;
+
+        localStorage.setItem(
+          'meu-roteiro-v1',
+          JSON.stringify(state)
+        );
+
+        syncCfg.lastRemote =
+          remote.updated_at || '';
+
+        localStorage.setItem(
+          SYNC_KEY,
+          JSON.stringify(syncCfg)
+        );
+
+        render();
+
+      }
+
+    }
+
+    if (
+      showMsg &&
+      window.syncMsg
+    ) {
+
+      syncMsg.textContent =
+        remote
+          ? 'Dados atualizados.'
+          : 'Ainda não há dados na nuvem.';
+
+    }
+
+    updateSyncBadge(
+      '☁️ Sincronizado',
+      true
+    );
+
+  }
+  catch (error) {
+
+    if (
+      showMsg &&
+      window.syncMsg
+    ) {
+
+      syncMsg.textContent =
+        'Erro ao atualizar: ' +
+        error.message;
+
+    }
+
+    updateSyncBadge(
+      '☁️ Offline',
+      false
+    );
+
+  }
+  finally {
+
+    syncBusy = false;
+
+  }
+
+}
+
+
+async function connectSync() {
+
+  if (!syncReady())
+    return;
+
+  try {
+
+    const result =
+      await syncApi('load');
+
+    const remote =
+      result.trip;
+
+    if (
+      remote &&
+      remote.data
+    ) {
+
+      const remoteTime =
+        Date.parse(
+          remote.updated_at || 0
+        );
+
+      const localTime =
+        Date.parse(
+          state._updatedAt || 0
+        );
+
+      if (
+        remoteTime >
+        localTime
+      ) {
+
+        state =
+          remote.data;
+
+        localStorage.setItem(
+          'meu-roteiro-v1',
+          JSON.stringify(state)
+        );
+
+        syncCfg.lastRemote =
+          remote.updated_at || '';
+
+        localStorage.setItem(
+          SYNC_KEY,
+          JSON.stringify(syncCfg)
+        );
+
+        render();
+
+      }
+      else {
+
+        await pushCloud(false);
+
+      }
+
+    }
+    else {
+
+      await pushCloud(false);
+
+    }
+
+    updateSyncBadge(
+      '☁️ Sincronizado',
+      true
+    );
+
+  }
+  catch (error) {
+
+    updateSyncBadge(
+      '☁️ Offline',
+      false
+    );
+
+  }
+
+}
+
+
+function scheduleCloudPush() {
+
+  if (
+    !syncReady() ||
+    syncCfg.auto === false
+  )
+    return;
+
+  clearTimeout(syncTimer);
+
+  syncTimer =
+    setTimeout(
+      () => pushCloud(false),
+      900
+    );
+
+}
+
+
+function setupSyncPolling() {
+
+  clearInterval(syncPoll);
+
+  if (
+    syncReady() &&
+    syncCfg.auto !== false
+  ) {
+
+    syncPoll =
+      setInterval(
+        () => pullCloud(false),
+        7000
+      );
+
+  }
+
+}
 document.querySelectorAll('select[name="date"]').forEach(s=>s.innerHTML=dates.map(d=>'<option value="'+d[0]+'">'+d[1]+'</option>').join(''));
-render();setupSyncPolling();updateSyncBadge();if(syncReady()&&syncCfg.auto!==false)setTimeout(()=>pullCloud(false),400);
-</script>
+render();
+setupSyncPolling();
+updateSyncBadge();
+
+if (syncReady()) {
+  setTimeout(
+    () => connectSync(),
+    400
+  );
+}</script>
 </body></html>
